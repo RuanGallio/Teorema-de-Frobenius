@@ -61,7 +61,7 @@ ax.set_xlabel("x")
 ax.set_ylabel("y")
 ax.set_zlabel("u")
 ax.set_title(r"Solution $u = e^{x+y} - y - 1$ and Vector Fields")
-ax.set_zlim(-2, 6)  # Taller Z limit
+ax.set_zlim(-2, 6)
 ax.legend()
 
 # --- 3. Animation ---

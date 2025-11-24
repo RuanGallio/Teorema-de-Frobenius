@@ -27,22 +27,21 @@ class VectorFieldsFrobenius(ThreeDScene):
             return np.array([0, 1, y])
 
         # 3. Create Arrow Groups
-        # We manually create a grid of arrows for cleaner control in 3D
         v1_arrows = VGroup()
         v2_arrows = VGroup()
 
-        grid_range = np.arange(-2, 2.1, 1)  # A coarse grid for clarity
+        grid_range = np.arange(-2, 2.1, 1)
 
         for x in grid_range:
             for y in grid_range:
                 point = np.array([x, y, 0])
 
-                # Create V1 arrow (RED)
+                # Create V1
                 vect1 = v1_func(point)
                 arrow1 = Arrow(start=point, end=point + 0.6 * vect1, buff=0, color=RED)
                 v1_arrows.add(arrow1)
 
-                # Create V2 arrow (BLUE)
+                # Create V2
                 vect2 = v2_func(point)
                 arrow2 = Arrow(start=point, end=point + 0.6 * vect2, buff=0, color=BLUE)
                 v2_arrows.add(arrow2)
