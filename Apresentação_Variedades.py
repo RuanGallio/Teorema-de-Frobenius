@@ -71,7 +71,7 @@ def parametrizacao_04(t):
     return np.array([x0, y0, z0])
 
 
-def subvariedade_integral(point, x_range=(-6, 6), y_range=(-6, 6)):
+def subvariedade_integral(point, x_range=(-6, 6), y_range=(-6, 6), res=30):
     """Retorna a superfície de nível de F(x,y,z) = z - x * y que passa pelo ponto fornecido.
     point: array/list/np.array de formato (3,) representando (x0, y0, z0)"""
 
@@ -86,7 +86,7 @@ def subvariedade_integral(point, x_range=(-6, 6), y_range=(-6, 6)):
         ]),
         u_range=[x_range[0], x_range[1]],
         v_range=[y_range[0], y_range[1]],
-        resolution=(30, 30),
+        resolution=(res, res),
         fill_opacity=1.0,
         stroke_color=WHITE,
     )
@@ -187,12 +187,20 @@ def big_phi(u0, v0, w0):
     return np.array([u0, v0, w0 + u0 * v0])  # Específico para o exemplo, mudar para generalizar
 
 
+def update_cod(ponto):
+    """Updater necessário para que dot_cod seja sempre atualizado para ser a imagem de dot_dom pela big_phi"""
+
+    u0, v0, w0 = axes_dom.p2c(dot_dom.get_center())  # pegar coordenadas em eixos do domínio
+    x0, y0, z0 = big_phi(u0, v0, w0)  # Aplicar função big_phi
+    ponto.move_to(axes_cod.c2p(x0, y0, z0))  # Mover o ponto (que será dot_cod) para a imagem de dot_dom
+
+
 # ----------------------------------------------
 # Criação dos elementos utilizados nas animações
 # ----------------------------------------------
 
 
-# Axes (eixos) principais a serem utilizados em todas as animações
+# Axes (eixos) principais a serem utilizados em todas as animações, exceto SistemaDeCoordenadas
 axes = ThreeDAxes(
     x_range=[-6, 6, 1],
     y_range=[-6, 6, 1],
@@ -202,8 +210,32 @@ axes = ThreeDAxes(
     z_length=12,
 )
 
-# Ponto que será constantemente utilizado
+# Axes a serem utilizados na animação SistemaDeCoordenadas
+axes_dom = ThreeDAxes(  # axes_dom é o domínio da função big_phi
+    x_range=[-5, 5, 1],
+    y_range=[-5, 5, 1],
+    z_range=[-5, 5, 1],
+    x_length=9,
+    y_length=9,
+    z_length=9,
+).shift(RIGHT * 3 + DOWN * 3)
+
+axes_cod = ThreeDAxes(  # axes_cod é o contradomínio da função big_phi
+    x_range=[-5, 5, 1],
+    y_range=[-5, 5, 1],
+    z_range=[-5, 5, 1],
+    x_length=9,
+    y_length=9,
+    z_length=9,
+).shift(LEFT * 3 + UP * 3)
+
+# Ponto que será utilizado nas animações, exceto SistemaDeCoordenadas
 dot = Dot3D(np.array([-1, -1, -1]), radius=0.08, color=YELLOW)
+
+# Pontos utilizados na animação SistemaDeCoordenadas
+dot_dom = Dot3D(axes_dom.c2p(0, 0, 0), color=YELLOW)  # dom = domínio da big_phi
+dot_cod = Dot3D(axes_cod.c2p(0, 0, 0), color=YELLOW)  # cod = contradomínio da big_phi
+dot_cod.add_updater(update_cod)                       # Updater no dot_cod
 
 # Campos de vetores X e Y iniciais do exemplo
 xs = np.linspace(-3, 3, 4)  # Coordenadas dos pontos que serão usados. No total, são 64 vetores (4 ** 3)
@@ -298,30 +330,162 @@ plane.add_updater(update_plane)  # Updater para seguir o ponto dot
 curvas_nivel_subv_integraveis = subvariedade_integral(dot.get_center())
 curvas_nivel_subv_integraveis.add_updater(update_subvariedade_integral)  # Updater para seguir o ponto dot
 
+# Elementos para a animação SistemaDeCoordenadas:
 
-class Animation(ThreeDScene):
+# Linha azul no domínio, representando coordenada z do dot_dom
+linha_z_dom = always_redraw(
+    lambda: Line3D(
+        start=axes_dom.c2p(
+            0,
+            0,
+            0
+        ),
+        end=axes_dom.c2p(
+            0,
+            0,
+            axes_dom.p2c(dot_dom.get_center())[2]
+        ),
+        color=BLUE,
+        thickness=0.03,
+    )
+)
+
+# Linha verde no domínio, representando coordenada y do dot_dom
+linha_y_dom = always_redraw(
+    lambda: Line3D(
+        start=axes_dom.c2p(
+            0,
+            0,
+            axes_dom.p2c(dot_dom.get_center())[2]
+        ),
+        end=axes_dom.c2p(
+            0,
+            axes_dom.p2c(dot_dom.get_center())[1],
+            axes_dom.p2c(dot_dom.get_center())[2]
+        ),
+        color=GREEN,
+        thickness=0.03,
+    )
+)
+
+# Linha vermelha no domínio, representando coordenada x do dot_dom
+linha_x_dom = always_redraw(
+    lambda: Line3D(
+        start=axes_dom.c2p(
+            0,
+            axes_dom.p2c(dot_dom.get_center())[1],
+            axes_dom.p2c(dot_dom.get_center())[2]
+        ),
+        end=axes_dom.c2p(
+            axes_dom.p2c(dot_dom.get_center())[0],
+            axes_dom.p2c(dot_dom.get_center())[1],
+            axes_dom.p2c(dot_dom.get_center())[2]
+        ),
+        color=RED,
+        thickness=0.03,
+    )
+)
+
+# OBS: primeiro é traçada a linha AZUL, depois a VERDE e por último a VERMELHA.
+# Essa ordem é a que mais se adequa à animação, tendo em vista que
+# iremos manter a coordenada z dos pontos constantes.
+
+# Linha azul no contradomínio, representando coordenada z do dot_cod
+linha_z_cod = always_redraw(
+    lambda: Line3D(
+        start=axes_cod.c2p(
+            0,
+            0,
+            0
+        ),
+        end=axes_cod.c2p(
+            0,
+            0,
+            axes_cod.p2c(dot_dom.get_center())[2]
+        ),
+        color=BLUE,
+        thickness=0.03,
+    )
+)
+
+# Linha verde no contradomínio, representando caminhar sobre o fluxo de W
+linha_y_cod = always_redraw(
+    lambda: Line3D(
+        start=axes_cod.c2p(
+            0,
+            0,
+            axes_cod.p2c(dot_dom.get_center())[2]
+        ),
+        end=axes_cod.c2p(
+            *fluxo_w(
+                axes_dom.p2c(dot_dom.get_center())[1],  # parâmetro t
+                0,
+                0,
+                axes_cod.p2c(dot_dom.get_center())[2]
+            )
+        ),
+        color=GREEN,
+        thickness=0.03,
+    )
+)
+
+# Linha vermelha no contradomínio, representando caminhar sobre o fluxo de V
+linha_x_cod = always_redraw(
+    lambda: Line3D(
+        start=axes_cod.c2p(  # Note que end=(0, v, w) = fluxo_w(v, 0, 0, w)
+            *fluxo_w(
+                axes_dom.p2c(dot_dom.get_center())[1],  # parâmetro t
+                0,
+                0,
+                axes_cod.p2c(dot_dom.get_center())[2]
+            )
+        ),
+        end=axes_cod.c2p(
+            *fluxo_v(
+                axes_dom.p2c(dot_dom.get_center())[0],  # parâmetro t
+                *fluxo_w(
+                    axes_dom.p2c(dot_dom.get_center())[1],  # parâmetro t
+                    0,
+                    0,
+                    axes_cod.p2c(dot_dom.get_center())[2]
+                )
+            )
+        ),
+        color=RED,
+        thickness=0.03,
+    )
+)
+
+lista_de_pontos_sistemadecoordenadas = [
+    (2, -2, 0),
+    (1.5, -2, 0),
+    (1.5, 2, 0),
+    (1, 2, 0),
+    (1, -2, 0),
+    (0.5, -2, 0),
+    (0.5, 2, 0),
+    (0, 2, 0),
+    (0, -2, 0),
+    (-0.5, -2, 0),
+    (-0.5, 2, 0),
+    (-1, 2, 0),
+    (-1, -2, 0),
+    (-1.5, -2, 0),
+    (-1.5, 2, 0),
+    (-2, 2, 0),
+    (-2, -2, 0),
+]
+
+
+# ---------
+# Animações
+# ---------
+
+
+class DistribuicaoCena01(ThreeDScene):
     def construct(self):
 
         self.renderer.camera.shading = False
-
-        # Texto do campo X
-        texto_campo_X = MathTex(
-            r"X = x\,\frac{\partial}{\partial x} + \frac{\partial}{\partial y} + x(y+1)\,\frac{\partial}{\partial z}",
-            color=RED
-        ).scale(0.7).to_corner(UL)
-
-        # Texto do campo Y
-        texto_campo_Y = MathTex(
-            r"Y = \frac{\partial}{\partial x} + y\,\frac{\partial}{\partial z}",
-            color=GREEN
-        ).scale(0.7).to_corner(UL)
-
-        """
-        Criação dos elementos:
-        """
-
-
-
         self.set_camera_orientation(phi=60 * DEGREES, theta=45 * DEGREES)
 
         """
@@ -339,64 +503,108 @@ class Animation(ThreeDScene):
         self.remove(dot, plane)
         self.wait(3)
 
+
+class DistribuicaoCena02(ThreeDScene):
+    def construct(self):
+
+        self.renderer.camera.shading = False
+        self.set_camera_orientation(phi=60 * DEGREES, theta=45 * DEGREES)
+
         """
         CENA: Ilustração dos dois campos de vetores X e Y que geram a distribuição
         """
 
+        # Texto do campo X
+        texto_campo_x = MathTex(
+            r"X = x\,\frac{\partial}{\partial x} + \frac{\partial}{\partial y} + x(y+1)\,\frac{\partial}{\partial z}",
+            color=RED
+        ).scale(0.7).to_corner(UL)
+
+        # Texto do campo Y
+        texto_campo_y = MathTex(
+            r"Y = \frac{\partial}{\partial x} + y\,\frac{\partial}{\partial z}",
+            color=GREEN
+        ).scale(0.7).to_corner(UL)
+
+        self.add(axes)
+
         # Mostra o campo de vetores X
         self.add(*vector_field_X)
         self.wait(2)
-        self.add_fixed_in_frame_mobjects(texto_campo_X)
-        self.add(texto_campo_X)
+
+        self.add_fixed_in_frame_mobjects(texto_campo_x)
+        self.play(Write(texto_campo_x))
         self.wait(2)
+
         self.move_camera(
             phi=60 * DEGREES,
             theta=405 * DEGREES,
             run_time=25,
             rate_func=linear
         )
-        self.wait()
-        self.remove(*vector_field_X, texto_campo_X)
-        self.wait()
+        self.wait(2)
+
+        self.remove(*vector_field_X, texto_campo_x)
+        self.wait(2)
 
         # Mostra o campo de vetores Y
         self.add(*vector_field_Y)
         self.wait(2)
-        self.add_fixed_in_frame_mobjects(texto_campo_Y)
-        self.add(texto_campo_Y)
+
+        self.add_fixed_in_frame_mobjects(texto_campo_y)
+        self.add(texto_campo_y)
         self.wait(2)
+
         self.move_camera(
             phi=60 * DEGREES,
             theta=405 * DEGREES,
             run_time=25,
             rate_func=linear
         )
-        self.wait()
-        self.remove(*vector_field_Y, texto_campo_Y)
-        self.wait()
+        self.wait(2)
+        self.remove(*vector_field_Y, texto_campo_y)
+        self.wait(2)
+
+
+class DistribuicaoCena03(ThreeDScene):
+    def construct(self):
+
+        self.renderer.camera.shading = False
+        self.set_camera_orientation(phi=60 * DEGREES, theta=45 * DEGREES)
 
         """
         CENA: Mostra como os campos geram a distribuição
         """
 
-        # Mostra os campos onde o ponto passa
+        self.add(axes)
+
+        # Mostra os campos por onde o ponto passa
         self.add(*mini_vector_field_X, *mini_vector_field_Y)
 
-        # --- Movement in straight segments ---
         self.add(dot, plane)
         self.wait()
+
+        # Movimentos em linha reta
         for ponto in lista_de_pontos:
             self.play(dot.animate.move_to(ponto), run_time=2, rate_func=smooth)
             self.wait()
         self.wait(5)
+
         self.remove(axes, dot, plane, *mini_vector_field_Y, *mini_vector_field_Y)
         self.wait()
+
+
+class LemaDistribuicaoInvolutiva(ThreeDScene):
+    def construct(self):
+
+        self.renderer.camera.shading = False
+        self.set_camera_orientation(phi=60 * DEGREES, theta=45 * DEGREES)
 
         """
         CENA: Texto na tela, demonstração do lema para distribuição involutiva
         """
 
-        texto_lema1_1 = Tex(
+        enunciado = Tex(
             r"\begin{flushleft}"
             r"Lema: Sejam $X, Y \in \mathfrak{X}(M)$ e "
             r"$D = \operatorname{ger}\{X,Y\}$ a distribuição gerada por tais campos. "
@@ -409,77 +617,85 @@ class Animation(ThreeDScene):
         dem1 = Tex(
             r"\begin{flushleft}"
             r"Demonstração: sejam $V, W \in \mathfrak{X}(M)$ campos subordinados a $D$, isto é, "
-            r"$V(p), W(p) \in D(p)$ para todo $p \in M$. Mostremos que $\left[ X, Y \right](p) \in D(p)$, "
+            r"$V(p), W(p) \in D(p)$ para todo $p \in M$. Mostremos que $\left[ V, W \right](p) \in D(p)$, "
             r"para todo ponto $p \in M$."
             r"\end{flushleft}",
             color=WHITE
-        ).scale(0.7).move_to(UP)
+        ).scale(0.7).move_to(UP * 1.25)
 
         dem2 = Tex(
             r"\begin{flushleft}"
-            r"Sabemos que $V = f_1 \cdot X + g_1 \cdot Y$ e $W = f_2 \cdot X + g_2 \cdot Y$, "
-            r"para certas $f_1, f_2, g_1, g_2 \in C^{\infty} (M)$. Desta forma, sendo $p \in M$ qualquer, temos que "
+            r"Sabemos que $V = f_1 X + g_1 Y$ e $W = f_2 X + g_2 Y$, para "
+            r"certas $f_1, f_2, g_1, g_2 \in C^{\infty} (M)$. Desta forma, usando a bilinearidade "
+            r"do colchete de Lie, temos que "
             r"\end{flushleft}"
-        ).scale(0.7).move_to(UP)
+        ).scale(0.7).move_to(DOWN * 0.5)
 
-        dem3 = Tex(
-            r"\text{Usando a bilinearidade do colchete de Lie, temos}",
-            color=WHITE
-        ).scale(0.7).move_to(UP)
-
-        dem4 = MathTex(
+        dem3 = MathTex(
             r"\begin{aligned}"
             r"[V, W]"
             r"&= [f_1 X + g_1 Y, f_2 X + g_2 Y] \\"
-            r"&= [f_1 X, f_2 X] + [f_1 X, g_2 Y] \\"
-            r"& + [g_1 Y, f_2 X] + [g_1 Y, g_2 Y]"
+            r"&= [f_1 X, f_2 X] + [f_1 X, g_2 Y] + [g_1 Y, f_2 X] + [g_1 Y, g_2 Y]"
             r"\end{aligned}",
             color=WHITE
-        ).scale(0.7).move_to(UP)
+        ).scale(0.7).move_to(DOWN * 2.75)
 
-        dem5 = Tex(
+        dem4 = Tex(
             r"Pela identidade $[fX, gY] = fg[X,Y] + f(Xg)Y - g(Yf)X$, obtemos:",
             color=WHITE
-        ).scale(0.7).move_to(UP)
+        ).scale(0.7).to_corner(UP)
 
-        dem6 = MathTex(
+        dem5 = MathTex(
             r"[f_1 X, f_2 X] = f_1 f_2 [X,X] + f_1(X f_2)X - f_2(X f_1)X, \\[6pt]"
             r"[f_1 X, g_2 Y] = f_1 g_2 [X,Y] + f_1(X g_2)Y - g_2(Y f_1)X, \\[6pt]"
             r"[g_1 Y, f_2 X] = g_1 f_2 [Y,X] + g_1(Y f_2)X - f_2(X g_1)Y, \\[6pt]"
             r"[g_1 Y, g_2 Y] = g_1 g_2 [Y,Y] + g_1(Y g_2)Y - g_2(Y g_1)Y.",
             color=WHITE
-        ).scale(0.7).move_to(UP)
+        ).scale(0.7).move_to(UP * 1.25)
+
+        dem6 = Tex(
+            r"Assim, temos $[V, W] = \alpha X + \beta Y + \theta [X, Y]$, com ",
+            color=WHITE
+        ).scale(0.7).move_to(DOWN)
 
         dem7 = Tex(
-            r"Assim, temos $[V, W] = \alpha \cdot X + \beta \cdot Y + \theta \cdot [X, Y]$, com ",
-            color=WHITE
-        ).scale(0.7).move_to(UP)
-
-        dem8 = Tex(
             r"$\alpha = f_1 X(f_2) - f_2 X(f_1) - g_2 Y(f_1) + g_1 Y(f_2)$;\\[6pt]"
             r"$\beta  = f_1 X(g_2) - f_2 X(g_1) + g_1 Y(f_2) - g_2 Y(g_1)$;\\[6pt]"
             r"$\theta = f_1 g_2 - g_1 f_2$.",
             color=WHITE
-        ).scale(0.7).move_to(UP)
+        ).scale(0.7).move_to(DOWN * 2.75)
 
-        dem9 = Tex(
-            r"Logo, para todo $p \in M$, "
+        dem8 = Tex(
+            r"Logo, para todo $p \in M$, \\"
             r"$[V, W](p) = \alpha(p)X(p) + \beta(p)Y(p) + \theta(p)[X, Y](p) \in D(p)$. \\"
             r"Portanto, D é involutiva.",
             color=WHITE
-        ).scale(0.7).move_to(UP)
+        ).scale(0.7).to_corner(UP)
 
-        textos = [texto_lema1_1, dem1, dem2, dem3, dem4, dem5, dem6, dem7, dem8, dem9]
+        textos = [enunciado, dem1, dem2, dem3, dem4, dem5, dem6, dem7, dem8]
 
+        textos_na_tela = []  # Guarda quais textos estão sendo exibidos
         for texto in textos:
+
             self.add_fixed_in_frame_mobjects(texto)
-            self.remove(texto)
-
-        for texto in textos:
-            self.play(Write(texto, run_time=2))
+            self.play(Write(texto, run_time=3))
             self.wait(2)
-            self.remove(texto)
+
+            textos_na_tela.append(texto)
+
+            if len(textos_na_tela) == 4:  # Máximo de textos por vez
+                self.remove(*textos_na_tela)
+                textos_na_tela.clear()
+
+        self.remove(*textos_na_tela)
         self.wait()
+
+
+class CalculoColchete(ThreeDScene):
+    def construct(self):
+
+        self.renderer.camera.shading = False
+        self.set_camera_orientation(phi=60 * DEGREES, theta=45 * DEGREES)
 
         """
         CENA: Texto na tela, cálculo do colchete de X e Y
@@ -487,56 +703,89 @@ class Animation(ThreeDScene):
 
         # OBSERVAÇÃO: FAZER O CÁLCULO
 
+
+class TextoTeoremaFrobeniusGeometrico(ThreeDScene):
+    def construct(self):
+
+        self.renderer.camera.shading = False
+        self.set_camera_orientation(phi=60 * DEGREES, theta=45 * DEGREES)
+
         """
         CENA: Texto na tela, enunciação do teorema geométrico de Frobenius
         """
 
         # OBSERVAÇÃO: ENUNCIAR
 
+
+class SubvariedadesIntegraveis(ThreeDScene):
+    def construct(self):
+
+        self.renderer.camera.shading = False
+        self.set_camera_orientation(phi=60 * DEGREES, theta=45 * DEGREES)
+        dot.move_to(end)
+
         """
         CENA: Mostrar subvariedades integráveis como curvas de nível
         """
 
-        self.wait()
-        self.add(dot, plane)
-        self.wait()
+        self.add(axes, dot, plane)
+        self.wait(2)
         self.move_camera(
             phi=60 * DEGREES,
             theta=120 * DEGREES,
             run_time=1,
             rate_func=smooth
         )
-        self.wait()
-
-
+        self.wait(2)
 
         self.add(curvas_nivel_subv_integraveis)
 
-
+        # Ponto dot percorrendo trajetórias e ilustrando distribuição tangente às subvariedades
         for curve in [level_path_01, level_path_02, level_path_03, path_04]:
             self.play(MoveAlongPath(dot, curve), run_time=4, rate_func=smooth)
             self.wait(2)
         self.wait(4)
 
-        foliacoes = []
-
-        for z in [-6, 6, 12]:
-            point = np.array([1, 2, z])
+        foliacoes = []  # Guarda 4 superfícies de nível para mostrar as foliações da distribuição
+        for z0 in [-2, 0, 2, 4]:
+            point = np.array([1, 2, z0])
             foliacoes.append(
-                subvariedade_integral(point)
+                subvariedade_integral(point, x_range=(-1, 1), y_range=(-1, 1), res=5)
             )
 
-        self.remove(plane)
+        self.remove(plane, curvas_nivel_subv_integraveis)
 
         for folha in foliacoes:
-            self.add(folha)
+            self.play(Create(folha))
             self.wait(1)
         self.wait(3)
 
-        self.remove(dot, curvas_nivel_subv_integraveis)
-        for folha in foliacoes:
-            self.remove(folha)
+        # Movimento de câmera para mostrar curvas de nível com mais clareza
+        self.move_camera(
+            phi=90 * DEGREES,
+            theta=0 * DEGREES,
+            run_time=3,
+            rate_func=smooth
+        )
+        self.move_camera(
+            phi=90 * DEGREES,
+            theta=360 * DEGREES,
+            run_time=25,
+            rate_func=linear
+        )
+        self.move_camera(
+            phi=60 * DEGREES,
+            theta=45 * DEGREES,
+            run_time=3,
+            rate_func=smooth
+        )
+
+        self.remove(dot, curvas_nivel_subv_integraveis, *foliacoes, axes)
         self.wait(5)
+
+
+class TextoLema01TeoremaFrobenius(ThreeDScene):
+    def construct(self):
 
         """
         CENA: Texto na tela, enunciação do Lema 01 teorema de Frobenius geométrico
@@ -572,23 +821,25 @@ class Animation(ThreeDScene):
 
         for texto in cena_lema_frobenius_1:
             self.add_fixed_in_frame_mobjects(texto)
-
-        for texto in cena_lema_frobenius_1:
-            self.play(Write(texto, run_time=2))
+            self.play(Write(texto, run_time=4))
             self.wait(2)
         self.wait(2)
 
-        for texto in cena_lema_frobenius_1:
-            self.remove(texto)
+        self.remove(*cena_lema_frobenius_1)
         self.wait()
+
+
+class CamposVeW(ThreeDScene):
+    def construct(self):
+
+        self.renderer.camera.shading = False
+        self.set_camera_orientation(phi=60 * DEGREES, theta=45 * DEGREES)
 
         """
         CENA: Campos V e W pi-relacionados com d/dx e d/dy
         """
 
-        self.wait()
-
-        self.add(dot, plane, axes)
+        self.add(axes, dot, plane)
         self.play(dot.animate.move_to(np.array([1, 1, 1])), run_time=1, rate_func=smooth)
         self.wait()
         self.move_camera(
@@ -610,7 +861,6 @@ class Animation(ThreeDScene):
         w_xy = w_proj(dot)
 
         # Animação dos vetores v_p e w_p sendo projetados no plano xy
-
         self.play(
             Transform(v_original, v_xy),
             Transform(w_original, w_xy),
@@ -619,6 +869,7 @@ class Animation(ThreeDScene):
         )
         self.wait()
 
+        # Movimento de câmera para mais clareza
         self.move_camera(
             phi=60 * DEGREES,
             theta=45 * DEGREES,
@@ -628,7 +879,6 @@ class Animation(ThreeDScene):
         self.wait()
 
         # Mostrar mais vetores que também são projetados onde v_p é projetado
-
         pontos_ponta_vetores = [
             np.array([2, 1, -1]),
             np.array([2, 1, 0]),
@@ -653,19 +903,17 @@ class Animation(ThreeDScene):
             self.wait()
         self.wait(2)
 
+        # Mostra a reta perpendicular ao plano xy projetada no ponto (2, 1, 0)
         reta = Line3D(
             start=np.array([2, 1, -6]),
             end=np.array([2, 1, 6]),
             color=YELLOW,
             thickness=0.01
         )
-        self.add(reta)
+        self.play(Create(reta))
         self.wait(6)
 
-        self.remove(axes, *vetores, reta, plane, dot, v_original, w_original, v(dot), w(dot))
-
-        # $d \pi (p) \cdot V_p = \frac{\partial}{\partial x}|_p = e_1$, for all $p \in M$
-
+        # Equação "diferencial x V_p = e_1" para aparecer na tela
         texto_campo_v = Tex(
             r"$d \pi (p) \cdot V_p = \frac{\partial}{\partial x} \right| _p = e_1$, para todo $p \in \mathbb{R}^3$",
             color=WHITE
@@ -687,13 +935,26 @@ class Animation(ThreeDScene):
 
         self.add_fixed_in_frame_mobjects(anotacao)
         anotacao.to_corner(DOWN)
-        self.wait(2)
+        self.wait(5)
 
         self.remove_fixed_in_frame_mobjects(anotacao)
         self.remove(anotacao)
 
-        # Mostrar a expressão da diferencial da projeção pi
+        self.remove(axes, *vetores, reta, plane, dot, v_original, w_original, v(dot), w(dot))
+        self.wait()
 
+
+class TextoCalculoCamposVeW(ThreeDScene):
+    def construct(self):
+
+        self.renderer.camera.shading = False
+        self.set_camera_orientation(phi=60 * DEGREES, theta=45 * DEGREES)
+
+        """
+        CENA: Texto na tela, cálculo dos campos V e W.
+        """
+
+        # Mostrar a expressão da diferencial da projeção pi
         texto_1 = Tex(
             r"A diferencial da função $\pi$ em qualquer ponto $p$, ",
             r"na sua forma matricial, é dada por \\",
@@ -723,14 +984,13 @@ class Animation(ThreeDScene):
             self.add_fixed_in_frame_mobjects(texto)
             self.remove(texto)
             self.wait()
-            self.play(Write(texto), run_time=2)
+            self.play(Write(texto), run_time=3)
         self.wait(2)
 
         self.remove(*textos)
         self.wait()
 
         # Mostrar o cálculo de diferencial \cdot Vp = e_1 e como V = 1 d/dx + 0 d/dy + u d/dz
-
         texto_1 = Tex(
             r"Nessas condições, podemos escrever"
         ).scale(0.7).to_corner(UP)
@@ -766,15 +1026,23 @@ class Animation(ThreeDScene):
             self.play(Write(texto), run_time=2)
         self.wait(2)
 
-        self.remove(texto_1, texto_2, texto_3, texto_4)
+        self.remove(*textos)
         self.wait()
 
-        # Analogamente, mostrar essas animações para w_p
 
-        # Sabendo as expressões para V e W, fazer continhas para ver que V = -Y e W = X - xY
+# Analogamente, mostrar essas animações para w_p
 
-        # Falar que, como a projeção restrita à distribuição é iso, a naturalidade do colchete
-        # garante que V e W tem [V, W] = 0
+# Sabendo as expressões para V e W, fazer continhas para ver que V = -Y e W = X - xY
+
+# Falar que, como a projeção restrita à distribuição é iso, a naturalidade do colchete
+# garante que V e W tem [V, W] = 0
+
+
+class TextoLema02FrobeniusGeometrico(ThreeDScene):
+    def construct(self):
+
+        self.renderer.camera.shading = False
+        self.set_camera_orientation(phi=60 * DEGREES, theta=45 * DEGREES)
 
         """
         CENA: Texto na tela, enunciação do Lema 02 teorema de Frobenius geométrico
@@ -821,267 +1089,136 @@ class Animation(ThreeDScene):
             self.remove(texto)
         self.wait()
 
-        """
-        CENA: Cálculo dos fluxos de V e W
-        """
 
-        # Fazer uma animação do fluxo de V que sai do ponto (1, 1, 1) e vai até (3, 1, 3)
+"""
+CENA: Cálculo dos fluxos de V e W
+"""
 
-        # No caminho, mostrar o campo V nos pontos (1, 1, 1), (2, 1, 2) e (3, 1, 3) (que serão tangentes ao fluxo)
+# Fazer uma animação do fluxo de V que sai do ponto (1, 1, 1) e vai até (3, 1, 3)
 
-        # $\phi_p (t) = (x(t), y(t), z(t))$
-        # Por um lado, $\phi ' _p (t) = (x'(t), y'(t), z'(t))$
-        # Por outro, $\phi ' _p (t) = V(\phi_p(t)) = a_1(\phi_p(t)) \frac{\partial}{\partial x} +
-        # a_2(\phi_p(t)) \frac{partial}{\partial y} + a_3(\phi_p(t)) \frac{\partial}{\partial z}$
+# No caminho, mostrar o campo V nos pontos (1, 1, 1), (2, 1, 2) e (3, 1, 3) (que serão tangentes ao fluxo)
 
-        # Daí, surge o sistema de equações
+# $\phi_p (t) = (x(t), y(t), z(t))$
+# Por um lado, $\phi ' _p (t) = (x'(t), y'(t), z'(t))$
+# Por outro, $\phi ' _p (t) = V(\phi_p(t)) = a_1(\phi_p(t)) \frac{\partial}{\partial x} +
+# a_2(\phi_p(t)) \frac{partial}{\partial y} + a_3(\phi_p(t)) \frac{\partial}{\partial z}$
 
-        # Mostrar resoluções dos sistemas, mas rapidinho
+# Daí, surge o sistema de equações
 
-        # Analogamente para o fluxo de W
+# Mostrar resoluções dos sistemas, mas rapidinho
+
+# Analogamente para o fluxo de W
+
+
+class TextoSistemaDeCoordenadas(ThreeDScene):
+    def construct(self):
+
+        self.renderer.camera.shading = False
+        self.set_camera_orientation(phi=60 * DEGREES, theta=45 * DEGREES)
 
         """
         CENA: Ilustração do sistema de coordenadas e das subvariedades integrais
         """
 
-        # Criação dos elementos da cena
-
-        # Texto para a definição da big_phi
+        # Texto para a definição da big_phi (\Phi)
         texto_1 = Tex(
-            r"Sabendo que os fluxos de V e W são dados por"
-            r"$$$$",
+            r"Sabendo que os fluxos de V e W são dados por \\"
+            r"$\phi ^V _t (x, y, z) = (x + t, y, z + ty)$ \\"
+            r"$\phi ^W _t (x, y, z) = (x, y + t, z + tx)$ \\"
+            r"definimos uma função $\Phi : \mathbb{R}^3 \longrightarrow \mathbb{R}^3$ dada por",
             color=WHITE
         ).scale(0.7).to_corner(UP)
 
-        # Cria dois eixos coordenados
-        axes_dom = ThreeDAxes(  # axes_dom é o domínio da função big_phi
-            x_range=[-5, 5, 1],
-            y_range=[-5, 5, 1],
-            z_range=[-5, 5, 1],
-            x_length=9,
-            y_length=9,
-            z_length=9,
-        ).shift(RIGHT * 3 + DOWN * 3)
+        texto_2 = MathTex(
+            r"\begin{aligned}"
+            r"\Phi(u,v,w)"
+            r"&= \phi_u^V \circ \phi_v^W (0,0,w)\\"
+            r"&= \phi_u^V (0,v,w)\\"
+            r"&= (u,\, v,\, w + uv)"
+            r"\end{aligned}",
+            color=WHITE
+        ).scale(0.7).move_to(UP * 0)
 
-        axes_cod = ThreeDAxes(  # axes_cod é o contradomínio da função big_phi
-            x_range=[-5, 5, 1],
-            y_range=[-5, 5, 1],
-            z_range=[-5, 5, 1],
-            x_length=9,
-            y_length=9,
-            z_length=9,
-        ).shift(LEFT * 3 + UP * 3)
+        texto_3 = Tex(
+            r"Vejamos um exemplo",
+            color=WHITE
+        ).scale(0.7).move_to(DOWN * 2)
 
-        # Cria ponto dot_dom (no domínio da big_phi) e sua imagem, dot_cod
-        dot_dom = Dot3D(axes_dom.c2p(0, 0, 0), color=YELLOW)  # dom = domínio
-        dot_cod = Dot3D(axes_cod.c2p(0, 0, 0), color=YELLOW)  # cod = contradomínio
+        textos = [texto_1, texto_2, texto_3]
 
-        # updater do ponto da imagem (dot_cod)
-        def update_cod(ponto):
-            # pegar coordenadas em eixos do domínio
-            u, v, w = axes_dom.p2c(dot_dom.get_center())
-            x, y, z = big_phi(u, v, w)
-            ponto.move_to(axes_cod.c2p(x, y, z))
+        for texto in textos:
+            self.add_fixed_in_frame_mobjects(texto)
+            self.play(Write(texto), run_time=4)
+            self.wait(2)
+        self.remove(*textos)
+        self.wait(2)
 
-        dot_cod.add_updater(update_cod)
 
-        # Linha azul no domínio, representando coordenada z do dot_dom
-        linha_z_dom = always_redraw(
-            lambda: Line3D(
-                start=axes_dom.c2p(
-                    0,
-                    0,
-                    0
-                ),
-                end=axes_dom.c2p(
-                    0,
-                    0,
-                    axes_dom.p2c(dot_dom.get_center())[2]
-                ),
-                color=BLUE,
-                thickness=0.03,
-            )
-        )
-
-        # Linha verde no domínio, representando coordenada y do dot_dom
-        linha_y_dom = always_redraw(
-            lambda: Line3D(
-                start=axes_dom.c2p(
-                    0,
-                    0,
-                    axes_dom.p2c(dot_dom.get_center())[2]
-                ),
-                end=axes_dom.c2p(
-                    0,
-                    axes_dom.p2c(dot_dom.get_center())[1],
-                    axes_dom.p2c(dot_dom.get_center())[2]
-                ),
-                color=GREEN,
-                thickness=0.03,
-            )
-        )
-
-        # Linha vermelha no domínio, representando coordenada x do dot_dom
-        linha_x_dom = always_redraw(
-            lambda: Line3D(
-                start=axes_dom.c2p(
-                    0,
-                    axes_dom.p2c(dot_dom.get_center())[1],
-                    axes_dom.p2c(dot_dom.get_center())[2]
-                ),
-                end=axes_dom.c2p(
-                    axes_dom.p2c(dot_dom.get_center())[0],
-                    axes_dom.p2c(dot_dom.get_center())[1],
-                    axes_dom.p2c(dot_dom.get_center())[2]
-                ),
-                color=RED,
-                thickness=0.03,
-            )
-        )
-
-        # OBS: primeiro é traçada a linha AZUL, depois a VERDE e por último a VERMELHA.
-        # Essa ordem é a que mais se adequa à animação, tendo em vista que
-        # iremos manter a coordenada z dos pontos constantes.
-
-        # Linha azul no contradomínio, representando coordenada z do dot_cod
-        linha_z_cod = always_redraw(
-            lambda: Line3D(
-                start=axes_cod.c2p(
-                    0,
-                    0,
-                    0
-                ),
-                end=axes_cod.c2p(
-                    0,
-                    0,
-                    axes_cod.p2c(dot_dom.get_center())[2]
-                ),
-                color=BLUE,
-                thickness=0.03,
-            )
-        )
-
-        # Linha verde no contradomínio, representando caminhar sobre o fluxo de W
-        linha_y_cod = always_redraw(
-            lambda: Line3D(
-                start=axes_cod.c2p(
-                    0,
-                    0,
-                    axes_cod.p2c(dot_dom.get_center())[2]
-                ),
-                end=axes_cod.c2p(
-                    *fluxo_w(
-                        axes_dom.p2c(dot_dom.get_center())[1],  # parâmetro t
-                        0,
-                        0,
-                        axes_cod.p2c(dot_dom.get_center())[2]
-                    )
-                ),
-                color=GREEN,
-                thickness=0.03,
-            )
-        )
-
-        # Linha vermelha no contradomínio, representando caminhar sobre o fluxo de V
-        linha_x_cod = always_redraw(
-            lambda: Line3D(
-                start=axes_cod.c2p(  # Note que end=(0, v, w) = fluxo_w(v, 0, 0, w)
-                    *fluxo_w(
-                        axes_dom.p2c(dot_dom.get_center())[1],  # parâmetro t
-                        0,
-                        0,
-                        axes_cod.p2c(dot_dom.get_center())[2]
-                    )
-                ),
-                end=axes_cod.c2p(
-                    *fluxo_v(
-                        axes_dom.p2c(dot_dom.get_center())[0],  # parâmetro t
-                        *fluxo_w(
-                            axes_dom.p2c(dot_dom.get_center())[1],  # parâmetro t
-                            0,
-                            0,
-                            axes_cod.p2c(dot_dom.get_center())[2]
-                        )
-                    )
-                ),
-                color=RED,
-                thickness=0.03,
-            )
-        )
-
-        # Início da cena
-
-        # Definir $\Phi(u, v, w) = \varphi_u^V \circ \varphi_v^W (0, 0, w)$
+class SistemaDeCoordenadas(ThreeDScene):
+    def construct(self):
 
         self.add(axes_dom, axes_cod, dot_dom, dot_cod)
         self.add(linha_x_dom, linha_y_dom, linha_z_dom)
         self.add(linha_x_cod, linha_y_cod, linha_z_cod)
 
+        texto_exemplo = MathTex(
+            r"\Phi(1, 2, 3) = \phi_1^V \circ \phi_2^W (0,0,3) = (1,\, 2,\, 3 + 1 \cdot 2) = (1,\, 2,\, 5)",
+            color=WHITE
+        ).scale(0.7).to_corner(DOWN)
+
+        self.add_fixed_in_frame_mobjects(texto_exemplo)
+        self.play(Write(texto_exemplo))
+
         # Ponto no domínio vagando pelo R^3 (para mostrar as linhas x, y e z no dom e cod)
         self.play(dot_dom.animate.move_to(axes_dom.c2p(0, 0, 3)), run_time=2)
+        self.wait(3)
         self.play(dot_dom.animate.move_to(axes_dom.c2p(0, 2, 3)), run_time=2)
+        self.wait(3)
         self.play(dot_dom.animate.move_to(axes_dom.c2p(1, 2, 3)), run_time=2)
+        self.wait(3)
+        self.remove(texto_exemplo)
+        self.wait(6)
+
         self.play(dot_dom.animate.move_to(axes_dom.c2p(2, 2, 0)), run_time=1)
+        self.wait()
 
-        self.wait(5)
-
-        pontos = [
-            (2, -2, 0),
-            (1.5, -2, 0),
-            (1.5, 2, 0),
-            (1, 2, 0),
-            (1, -2, 0),
-            (0.5, -2, 0),
-            (0.5, 2, 0),
-            (0, 2, 0),
-            (0, -2, 0),
-            (-0.5, -2, 0),
-            (-0.5, 2, 0),
-            (-1, 2, 0),
-            (-1, -2, 0),
-            (-1.5, -2, 0),
-            (-1.5, 2, 0),
-            (-2, 2, 0),
-            (-2, -2, 0),
-        ]
-
+        # TracedPaths para mostrar o caminho percorrido pelos pontos dot_dom e dot_cod
         traced_dom = TracedPath(
             lambda: dot_dom.get_center(),
             stroke_color=YELLOW,
             stroke_width=4
         )
-
         traced_cod = TracedPath(
             lambda: dot_cod.get_center(),
             stroke_color=YELLOW,
             stroke_width=4
         )
 
+        # Adiciona os TracedPaths
         self.add(traced_dom)
-
         axes_cod.add(traced_cod)  # o tracedpath do cod pertence ao sistema de eixos axes_cod para girar com ele
 
-        for (x, y, z) in pontos:
+        # Faz o dot_dom se mover em zigue-zague, mantendo sua coordenada z constante
+        for (x0, y0, z0) in lista_de_pontos_sistemadecoordenadas:
             self.play(
-                dot_dom.animate.move_to(axes_dom.c2p(x, y, z)),
+                dot_dom.animate.move_to(axes_dom.c2p(x0, y0, z0)),
                 run_time=0.1,
                 rate_func=linear
             )
-
         self.wait(2)
 
         self.remove(dot_cod)
+
+        # Rotaciona o axes_cod para vermos melhor o caminho traçado por dot_cod
         self.play(
             Rotate(
                 axes_cod,
                 angle=2 * PI,
                 axis=OUT,
-                run_time=4,
+                run_time=10,
                 rate_func=linear
             )
         )
-
-        # Definir $\Phi(u, v, w) = \varphi_u^V \circ \varphi_v^W (0, 0, w)$
 
         # Exemplo: $\Phi(1, 2, 3) = \varphi_1^V \circ \varphi_2^W (0, 0, 3)$
         # A partir do ponto (0, 0, 3), andar uma unidade no fluxo de V e duas no fluxo de W
